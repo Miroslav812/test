@@ -1,0 +1,55 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "rest-api-testkit"
+version = "0.1.0"
+description = "REST API automation with typed clients, contracts and isolated HTTP tests"
+requires-python = ">=3.12,<3.14"
+dependencies = [
+  "httpx>=0.28,<0.29",
+  "pydantic[email]>=2.11,<3",
+  "pydantic-settings>=2.10,<3",
+]
+
+[dependency-groups]
+dev = [
+  "pytest>=8.4,<9",
+  "pytest-xdist>=3.8,<4",
+  "allure-pytest>=2.15,<3",
+  "fastapi>=0.116,<1",
+  "uvicorn>=0.35,<1",
+  "ruff>=0.12,<1",
+  "mypy>=1.17,<2",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/restkit"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-config --strict-markers"
+markers = [
+  "smoke: critical API checks",
+  "contract: response schema checks",
+  "negative: invalid inputs and authorization checks",
+  "mutation: creates, updates or deletes remote data",
+  "demo: checks specific to the bundled demonstration API",
+]
+filterwarnings = ["error"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM"]
+
+[tool.mypy]
+plugins = ["pydantic.mypy"]
+# Allure's public decorators are re-exported from its untyped implementation.
+untyped_calls_exclude = ["allure_commons"]
+python_version = "3.12"
+strict = true
+files = ["src", "demo_api", "tests"]

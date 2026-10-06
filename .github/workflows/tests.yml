@@ -1,0 +1,43 @@
+name: REST API tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.12", "3.13"]
+    env:
+      UV_PYTHON: ${{ matrix.python }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.12.19"
+          enable-cache: true
+      - name: Install locked dependencies
+        run: uv sync --frozen --python ${{ matrix.python }}
+      - name: Lint, format and types
+        run: |
+          uv run --frozen ruff check .
+          uv run --frozen ruff format --check .
+          uv run --frozen mypy
+      - name: Run isolated HTTP tests
+        run: uv run --frozen pytest -n 2 --alluredir=reports/allure-results --clean-alluredir --junitxml=reports/junit.xml
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-reports-py${{ matrix.python }}
+          path: reports/
+          if-no-files-found: warn
+          retention-days: 14
