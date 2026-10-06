@@ -460,6 +460,13 @@ dev = [
     { name = "ruff" },
     { name = "uvicorn" },
 ]
+test = [
+    { name = "allure-pytest" },
+    { name = "fastapi" },
+    { name = "pytest" },
+    { name = "pytest-xdist" },
+    { name = "uvicorn" },
+]
 
 [package.metadata]
 requires-dist = [
@@ -476,6 +483,13 @@ dev = [
     { name = "pytest", specifier = ">=8.4,<9" },
     { name = "pytest-xdist", specifier = ">=3.8,<4" },
     { name = "ruff", specifier = ">=0.12,<1" },
+    { name = "uvicorn", specifier = ">=0.35,<1" },
+]
+test = [
+    { name = "allure-pytest", specifier = ">=2.15,<3" },
+    { name = "fastapi", specifier = ">=0.116,<1" },
+    { name = "pytest", specifier = ">=8.4,<9" },
+    { name = "pytest-xdist", specifier = ">=3.8,<4" },
     { name = "uvicorn", specifier = ">=0.35,<1" },
 ]
 

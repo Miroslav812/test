@@ -41,3 +41,20 @@ jobs:
           path: reports/
           if-no-files-found: warn
           retention-days: 14
+
+  windows-minimal:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install minimal tools and run tests through the Windows script
+        shell: powershell
+        run: '& .\scripts\setup-windows.ps1'
+      - name: Upload Windows test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-reports-windows-minimal
+          path: reports/
+          if-no-files-found: warn
+          retention-days: 14
