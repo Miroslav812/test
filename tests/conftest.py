@@ -15,6 +15,7 @@ from restkit.client import ApiClient
 from restkit.config import Settings
 from restkit.contracts import User, assert_contract, assert_status
 from tests.factories import user_payload
+from tests.helpers import read_all_users
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
@@ -150,3 +151,27 @@ def create_user(users: UsersApi) -> Iterator[Callable[..., User]]:
         except httpx.HTTPError as exc:
             failures.append(type(exc).__name__)
     assert not failures, f"Test data cleanup failed: {failures}"
+
+
+@pytest.fixture
+def owned_payloads(users: UsersApi) -> Iterator[Callable[..., dict[str, Any]]]:
+    emails: set[str] = set()
+
+    def create(**overrides: Any) -> dict[str, Any]:
+        payload = user_payload(**overrides)
+        # Ownership is recorded before a request, even if a racing response is never validated.
+        emails.add(str(payload["email"]))
+        return payload
+
+    yield create
+    failures = []
+    for user in read_all_users(users):
+        if str(user.email) not in emails:
+            continue
+        try:
+            response = users.delete(str(user.id))
+            if response.status_code not in {204, 404}:
+                failures.append(f"HTTP {response.status_code}")
+        except httpx.HTTPError as exc:
+            failures.append(type(exc).__name__)
+    assert not failures, f"Owned test data cleanup failed: {failures}"

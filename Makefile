@@ -1,4 +1,4 @@
-.PHONY: install check test smoke parallel ui ui-headed all report demo
+.PHONY: install check test smoke parallel ui ui-headed all advanced concurrency resilience report demo
 
 install:
 	uv sync --frozen
@@ -25,6 +25,15 @@ ui-headed:
 
 all:
 	uv run --frozen --group ui pytest tests --alluredir=reports/allure-results --clean-alluredir --junitxml=reports/junit.xml
+
+advanced:
+	uv run --frozen --group ui pytest tests -m advanced --alluredir=reports/advanced/allure-results --clean-alluredir --junitxml=reports/advanced/junit.xml
+
+concurrency:
+	uv run --frozen pytest -m concurrency
+
+resilience:
+	uv run --frozen --group ui pytest tests/ui -m resilience
 
 report:
 	allure generate reports/allure-results --clean -o reports/allure-report

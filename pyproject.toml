@@ -45,6 +45,9 @@ markers = [
   "mutation: creates, updates or deletes remote data",
   "demo: checks specific to the bundled demonstration API",
   "ui: Selenium browser scenarios (run with pytest tests/ui)",
+  "advanced: multi-step consistency and recovery scenarios",
+  "concurrency: synchronized parallel HTTP operations, not load benchmarks",
+  "resilience: recovery after browser network failures",
 ]
 filterwarnings = ["error"]
 

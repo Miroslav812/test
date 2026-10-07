@@ -34,7 +34,7 @@ uv run --frozen --no-default-groups --group test pytest
 ```
 
 uv автоматически найдёт или скачает Python 3.12 и подготовит `.venv`. При успешном
-прогоне ожидается `39 passed`. Если WinGet отсутствует или Windows блокирует сам
+прогоне ожидается `82 passed`. Если WinGet отсутствует или Windows блокирует сам
 `uv.exe`, сохраните точный текст сообщения для дальнейшей диагностики. Не отключайте
 защиту компьютера для продолжения установки.
 
@@ -46,7 +46,7 @@ uv автоматически найдёт или скачает Python 3.12 и 
 
 Скрипт скачает uv 0.12.19 из официального GitHub release, проверит SHA-256 архива,
 затем uv автоматически найдёт или скачает Python 3.12 и установит зависимости
-тестов в `.venv`. После установки сразу запустится API-набор (39 проверок). Окно останется
+тестов в `.venv`. После установки сразу запустится API-набор (82 проверки). Окно останется
 открытым, чтобы можно было прочитать результат; для закрытия нажмите любую клавишу.
 Для повторного запуска снова откройте `run-tests.cmd`.
 
@@ -96,6 +96,8 @@ uv run --frozen --no-default-groups --group test pytest
 - UI: вход/выход, формы, роли, создание/изменение/удаление пользователей и поиск.
 - Проверка сохранения UI-действий через API и безопасного отображения пользовательского HTML.
 - Новый браузер для каждого теста; screenshot и DOM в Allure при падении.
+- Параллельные конфликты POST/PATCH/DELETE, проверки атомарности отказов и неизменяемых полей.
+- UI: восстановление после потери сети, работа двух сессий и список из 102 пользователей.
 
 ## UI-тесты Selenium: Windows 10/11
 
@@ -110,7 +112,7 @@ uv run --frozen --no-default-groups --group ui pytest tests/ui --browser edge --
 `--headed` показывает окно браузера. Без него тесты выполняются headless.
 Для Chrome замените `--browser edge` на `--browser chrome`. Chrome — выбор по умолчанию.
 Локальная страница и API поднимаются и останавливаются фикстурами; отдельно запускать
-сервер не нужно. Ожидается **12 UI-тестов**.
+сервер не нужно. Ожидается **22 UI-теста**.
 
 Selenium Manager автоматически подбирает WebDriver под установленный браузер при
 первом запуске; для загрузки нужен Интернет. Если менеджер не может скачать драйвер,
@@ -123,14 +125,14 @@ Selenium Manager автоматически подбирает WebDriver под 
 uv run --frozen --no-default-groups --group ui pytest tests/ui --browser edge --alluredir=reports/ui/allure-results --clean-alluredir --junitxml=reports/ui/junit.xml
 ```
 
-Для **всех 51 теста (API + инфраструктура + UI)**:
+Для **всех 104 тестов (API + инфраструктура + UI)**:
 
 ```powershell
 uv run --frozen --no-default-groups --group ui pytest tests --browser edge
 ```
 
-Команда `pytest` без указания папки по-прежнему выполняет 39 API/инфраструктурных
-проверок. Это сохраняет минимальный запуск без установки браузера и Selenium.
+Команда `pytest` без указания папки выполняет 82 проверки API и инфраструктуры.
+Это сохраняет минимальный запуск без установки браузера и Selenium.
 
 ## Структура
 
@@ -146,6 +148,7 @@ demo_api/web/          # интерфейс, работающий с тем же
 tests/
   conftest.py          # запуск сервера, клиенты, авторизация, cleanup
   factories.py        # уникальные данные
+  helpers.py          # полный снимок данных и синхронизированные параллельные запросы
   api/                # функциональные REST-сценарии
   unit/               # проверки инфраструктуры клиента
   ui/                 # Selenium-фикстуры, браузерные сценарии и диагностика
@@ -163,6 +166,9 @@ make parallel          # API + инфраструктура в двух workers
 make ui                # UI, headless Chrome
 make ui-headed         # UI с видимым окном Chrome
 make all               # все API + UI тесты
+make advanced          # сложные API + UI сценарии
+make concurrency       # четыре API-сценария с параллельными запросами
+make resilience        # восстановление UI после потери сети
 # Без make:
 uv run --frozen pytest -m negative
 uv run --frozen pytest -m contract
@@ -183,6 +189,27 @@ uv run --frozen pytest --alluredir=reports/allure-results --clean-alluredir --ju
 Allure CLI не требуется для тестов или получения JSON-результатов. CI сохраняет
 результаты как artifacts для каждой версии Python и браузера на 14 дней.
 Отдельная UI-матрица выполняется на Windows в Chrome и Edge.
+
+## Сложные сценарии
+
+Добавлены 53 проверки: 43 API и 10 UI. Вместе с исходными сценариями набор содержит
+65 API-тестов, 17 проверок инфраструктуры и 22 UI-теста. Подробнее: [docs/advanced-testing.md](docs/advanced-testing.md).
+
+```powershell
+# Все новые сценарии, включая UI в Edge
+uv run --frozen --no-default-groups --group ui pytest tests -m advanced --browser edge --headed
+
+# Только параллельные API-конфликты, браузер не нужен
+uv run --frozen --no-default-groups --group test pytest -m concurrency
+
+# UI: потеря сети и повторная попытка после восстановления
+uv run --frozen --no-default-groups --group ui pytest tests/ui -m resilience --browser edge
+```
+
+Параллельные тесты проверяют корректность при восьми конкурирующих клиентах.
+Это проверки согласованности данных, а не измерение производительности или нагрузки.
+Все новые сценарии отмечены `demo`: они используют изолированное учебное приложение
+и пропускаются в режиме `--api-mode external`.
 
 Для внешних стендов отчёты и traceback могут содержать тестовые данные. Не включайте
 HTTPX DEBUG/INFO, `--showlocals` или вложения сырых headers/body при работе с секретами.

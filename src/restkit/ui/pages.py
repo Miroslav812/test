@@ -42,6 +42,10 @@ class BasePage:
         if value:
             element.send_keys(value)
 
+    def validation_message(self, field: str) -> str:
+        # Native validation messages are localized; tests assert presence rather than English text.
+        return str(self._visible(field).get_property("validationMessage"))
+
 
 class LoginPage(BasePage):
     def open(self, base_url: str) -> "LoginPage":
@@ -66,10 +70,6 @@ class LoginPage(BasePage):
     @property
     def error_message(self) -> str:
         return self._visible("login-error").text
-
-    def validation_message(self, field: str) -> str:
-        # Native validation messages are localized; tests assert their presence, not English text.
-        return str(self._visible(field).get_property("validationMessage"))
 
 
 @dataclass(frozen=True)
@@ -118,10 +118,27 @@ class UsersPage(BasePage):
         )
 
     def edit_user(self, email: str, name: str) -> None:
+        self.start_edit(email)
+        self.submit_edit(name)
+        self.wait_for_notice("User updated")
+
+    def start_edit(self, email: str) -> None:
         self._row(email).find_element(*test_id("edit-user")).click()
-        self._fill("edit-name", name)
+
+    def submit_edit(self, name: str) -> None:
+        self.change_edit_name(name)
         self._click("save-user")
-        self.wait.until(EC.text_to_be_present_in_element(test_id("user-notice"), "User updated"))
+
+    def change_edit_name(self, name: str) -> None:
+        self._fill("edit-name", name)
+
+    def cancel_edit(self) -> None:
+        self._click("cancel-edit")
+        self.wait.until(EC.invisibility_of_element_located(test_id("edit-form")))
+
+    def wait_for_notice(self, message: str) -> None:
+        self.wait.until(EC.text_to_be_present_in_element(test_id("user-notice"), message))
+        self._visible("user-notice")
 
     def delete_user(self, email: str) -> None:
         row = self._row(email)
@@ -142,6 +159,10 @@ class UsersPage(BasePage):
     @property
     def error_message(self) -> str:
         return self._visible("user-error").text
+
+    @property
+    def error_visible(self) -> bool:
+        return self.driver.find_element(*test_id("user-error")).is_displayed()
 
     @property
     def empty_message(self) -> str:

@@ -1,7 +1,7 @@
 import logging
 import os
 import re
-from collections.abc import Generator, Iterator
+from collections.abc import Callable, Generator, Iterator
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -17,16 +17,15 @@ from selenium.webdriver.edge.options import Options as EdgeOptions
 from selenium.webdriver.edge.service import Service as EdgeService
 from selenium.webdriver.remote.webdriver import WebDriver
 
-from restkit.apis.users import UsersApi
-from restkit.contracts import UserPage, assert_contract, assert_status
 from restkit.ui.pages import LoginPage, UsersPage
-from tests.factories import user_payload
 
 logger = logging.getLogger(__name__)
 
 
 @pytest.fixture
-def browser(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch) -> Iterator[WebDriver]:
+def browser_factory(
+    request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+) -> Iterator[Callable[[], WebDriver]]:
     config = request.config
     binary = config.getoption("--browser-binary") or os.getenv("UI_BROWSER_BINARY")
     driver_path = config.getoption("--driver-path") or os.getenv("UI_DRIVER_PATH")
@@ -50,26 +49,50 @@ def browser(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch) -> 
         if binary:
             options.binary_location = binary
 
-    if config.getoption("--browser") == "edge":
-        edge_options = EdgeOptions()
-        configure(edge_options)
-        driver: WebDriver = webdriver.Edge(
-            service=EdgeService(executable_path=driver_path), options=edge_options
-        )
-    else:
-        chrome_options = ChromeOptions()
-        configure(chrome_options)
-        driver = webdriver.Chrome(
-            service=ChromeService(executable_path=driver_path), options=chrome_options
-        )
-    try:
+    drivers: list[WebDriver] = []
+
+    def create() -> WebDriver:
+        if config.getoption("--browser") == "edge":
+            edge_options = EdgeOptions()
+            configure(edge_options)
+            driver: WebDriver = webdriver.Edge(
+                service=EdgeService(executable_path=driver_path), options=edge_options
+            )
+        else:
+            chrome_options = ChromeOptions()
+            configure(chrome_options)
+            driver = webdriver.Chrome(
+                service=ChromeService(executable_path=driver_path), options=chrome_options
+            )
+        # Register before initialization so a timeout-setting error cannot leak the process.
+        drivers.append(driver)
         # Mixing implicit and explicit waits makes timeout durations unpredictable.
         driver.implicitly_wait(0)
         driver.set_page_load_timeout(15)
         driver.set_script_timeout(10)
-        yield driver
+        return driver
+
+    try:
+        yield create
     finally:
-        driver.quit()
+        failures = []
+        for driver in reversed(drivers):
+            try:
+                driver.quit()
+            except Exception as exc:
+                # Try every owned browser; one broken session must not leak the remaining ones.
+                failures.append(type(exc).__name__)
+        assert not failures, f"Browser cleanup failed: {failures}"
+
+
+@pytest.fixture
+def browser(browser_factory: Callable[[], WebDriver]) -> WebDriver:
+    return browser_factory()
+
+
+@pytest.fixture
+def second_browser(browser_factory: Callable[[], WebDriver]) -> WebDriver:
+    return browser_factory()
 
 
 @pytest.fixture
@@ -83,27 +106,8 @@ def users_page(login_page: LoginPage) -> UsersPage:
 
 
 @pytest.fixture
-def ui_payload(users: UsersApi) -> Iterator[dict[str, Any]]:
-    payload = user_payload()
-    yield payload
-    # UI-created records may exist even if the assertion failed before an ID could be captured.
-    # Match only the unique email owned by this test; never reset the shared application store.
-    offset = 0
-    owned_ids: list[str] = []
-    while True:
-        response = users.list(limit=100, offset=offset)
-        assert_status(response, 200)
-        page = assert_contract(response, UserPage)
-        owned_ids.extend(str(user.id) for user in page.items if user.email == payload["email"])
-        offset += len(page.items)
-        if not page.items or offset >= page.total:
-            break
-    failures = []
-    for identifier in owned_ids:
-        response = users.delete(identifier)
-        if response.status_code not in {204, 404}:
-            failures.append(response.status_code)
-    assert not failures, f"UI test data cleanup failed: {failures}"
+def ui_payload(owned_payloads: Callable[..., dict[str, Any]]) -> dict[str, Any]:
+    return owned_payloads()
 
 
 @pytest.hookimpl(wrapper=True)
@@ -111,19 +115,29 @@ def pytest_runtest_makereport(
     item: pytest.Item, call: pytest.CallInfo[None]
 ) -> Generator[None, pytest.TestReport, pytest.TestReport]:
     report = yield
-    driver = item.funcargs.get("browser") if isinstance(item, pytest.Function) else None
-    if report.failed and report.when in {"setup", "call"} and isinstance(driver, WebDriver):
-        try:
-            name = re.sub(r"[^A-Za-z0-9_.-]", "_", item.nodeid)[:140] + f"-{uuid4().hex[:8]}"
-            output = Path("reports/ui/screenshots")
-            output.mkdir(parents=True, exist_ok=True)
-            screenshot = driver.get_screenshot_as_png()
-            (output / f"{name}.png").write_bytes(screenshot)
-            allure.attach(screenshot, name="UI failure", attachment_type=allure.attachment_type.PNG)
-            allure.attach(
-                driver.page_source, name="Page DOM", attachment_type=allure.attachment_type.HTML
-            )
-        except (WebDriverException, OSError) as exc:
-            # Diagnostics must never replace the assertion that actually caused the failure.
-            logger.warning("Could not capture UI diagnostics: %s", type(exc).__name__)
+    if report.failed and report.when in {"setup", "call"} and isinstance(item, pytest.Function):
+        for browser_name in ("browser", "second_browser"):
+            driver = item.funcargs.get(browser_name)
+            if not isinstance(driver, WebDriver):
+                continue
+            try:
+                name = re.sub(r"[^A-Za-z0-9_.-]", "_", item.nodeid)[:120]
+                name += f"-{browser_name}-{uuid4().hex[:8]}"
+                output = Path("reports/ui/screenshots")
+                output.mkdir(parents=True, exist_ok=True)
+                screenshot = driver.get_screenshot_as_png()
+                (output / f"{name}.png").write_bytes(screenshot)
+                allure.attach(
+                    screenshot,
+                    name=f"UI failure ({browser_name})",
+                    attachment_type=allure.attachment_type.PNG,
+                )
+                allure.attach(
+                    driver.page_source,
+                    name=f"Page DOM ({browser_name})",
+                    attachment_type=allure.attachment_type.HTML,
+                )
+            except (WebDriverException, OSError) as exc:
+                # Diagnostics must never replace the assertion that actually caused the failure.
+                logger.warning("Could not capture UI diagnostics: %s", type(exc).__name__)
     return report
