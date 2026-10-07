@@ -1,9 +1,12 @@
 from datetime import UTC, datetime
+from pathlib import Path
 from threading import RLock
 from typing import Annotated, Literal
 from uuid import UUID, uuid4
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Response
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 DEMO_TOKEN = "local-demo-token"
@@ -40,9 +43,16 @@ def authorize(authorization: Annotated[str | None, Header()] = None) -> None:
 
 def create_app() -> FastAPI:
     app = FastAPI(title="REST Testkit Demo", version="1.0.0")
+    web_directory = Path(__file__).parent / "web"
+    app.mount("/ui/assets", StaticFiles(directory=web_directory), name="ui-assets")
     users: dict[UUID, StoredUser] = {}
     lock = RLock()
     auth = [Depends(authorize)]
+
+    @app.get("/ui", include_in_schema=False)
+    def ui() -> FileResponse:
+        # The UI and API share an origin, so tests exercise real requests without CORS overrides.
+        return FileResponse(web_directory / "index.html")
 
     def find(user_id: UUID) -> StoredUser:
         if user_id not in users:

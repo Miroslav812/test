@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "rest-api-testkit"
 version = "0.1.0"
-description = "REST API automation with typed clients, contracts and isolated HTTP tests"
+description = "REST API and Selenium UI automation with isolated demo services"
 requires-python = ">=3.12,<3.14"
 dependencies = [
   "httpx>=0.28,<0.29",
@@ -23,15 +23,20 @@ test = [
 ]
 dev = [
   {include-group = "test"},
+  {include-group = "ui"},
   "ruff>=0.12,<1",
   "mypy>=1.17,<2",
+]
+ui = [
+  {include-group = "test"},
+  "selenium>=4.34,<5",
 ]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/restkit"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["tests/api", "tests/unit"]
 addopts = "-ra --strict-config --strict-markers"
 markers = [
   "smoke: critical API checks",
@@ -39,6 +44,7 @@ markers = [
   "negative: invalid inputs and authorization checks",
   "mutation: creates, updates or deletes remote data",
   "demo: checks specific to the bundled demonstration API",
+  "ui: Selenium browser scenarios (run with pytest tests/ui)",
 ]
 filterwarnings = ["error"]
 

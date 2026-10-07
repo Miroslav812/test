@@ -1,4 +1,4 @@
-name: REST API tests
+name: API and Selenium UI tests
 
 on:
   push:
@@ -56,5 +56,31 @@ jobs:
         with:
           name: api-reports-windows-minimal
           path: reports/
+          if-no-files-found: warn
+          retention-days: 14
+
+  selenium:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chrome, edge]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.12.19"
+          enable-cache: true
+      - name: Install Selenium and test dependencies
+        run: uv sync --frozen --no-default-groups --group ui
+      - name: Run Selenium UI tests
+        run: uv run --frozen --no-default-groups --group ui pytest tests/ui --browser ${{ matrix.browser }} -n 2 --alluredir=reports/ui/allure-results --clean-alluredir --junitxml=reports/ui/junit.xml
+      - name: Upload UI results and failure screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-reports-${{ matrix.browser }}
+          path: reports/ui/
           if-no-files-found: warn
           retention-days: 14

@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Testkit — Users</title>
+  <link rel="stylesheet" href="/ui/assets/style.css">
+  <script src="/ui/assets/app.js" defer></script>
+</head>
+<body>
+  <main>
+    <header><p>REST &amp; UI Testkit</p><h1>User management</h1></header>
+    <section data-testid="login-panel">
+      <h2>Sign in</h2>
+      <p>Demo credentials: demo / demo</p>
+      <form data-testid="login-form">
+        <label>Username <input data-testid="username" name="username" autocomplete="username" required></label>
+        <label>Password <input data-testid="password" name="password" type="password" autocomplete="current-password" required></label>
+        <button data-testid="sign-in" type="submit">Sign in</button>
+      </form>
+      <p data-testid="login-error" role="alert" hidden></p>
+    </section>
+    <section data-testid="dashboard" hidden>
+      <div class="toolbar"><h2>Users</h2><button data-testid="logout" type="button">Sign out</button></div>
+      <form data-testid="create-form">
+        <h3>Create user</h3>
+        <label>Name <input data-testid="new-name" name="name" required maxlength="100"></label>
+        <label>Email <input data-testid="new-email" name="email" type="email" required></label>
+        <label>Role <select data-testid="new-role" name="role"><option value="user">User</option><option value="admin">Admin</option></select></label>
+        <button data-testid="create-user" type="submit">Create user</button>
+      </form>
+      <form data-testid="edit-form" hidden>
+        <h3>Edit user</h3>
+        <label>Name <input data-testid="edit-name" name="name" required maxlength="100"></label>
+        <button data-testid="save-user" type="submit">Save changes</button>
+        <button data-testid="cancel-edit" type="button">Cancel</button>
+      </form>
+      <p data-testid="user-error" role="alert" hidden></p>
+      <p data-testid="user-notice" role="status" hidden></p>
+      <div class="toolbar">
+        <label>Search by name or email <input data-testid="search" type="search"></label>
+        <button data-testid="refresh-users" type="button">Refresh</button>
+      </div>
+      <table data-testid="users-table">
+        <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Actions</th></tr></thead>
+        <tbody data-testid="users-body" data-loaded="false"></tbody>
+      </table>
+      <p data-testid="empty-state" hidden>No users match your search.</p>
+    </section>
+  </main>
+</body>
+</html>

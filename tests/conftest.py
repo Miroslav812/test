@@ -26,6 +26,16 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         action="store_true",
         help="Allow tests to create/update/delete data on an external test stand",
     )
+    browser = parser.getgroup("Selenium UI")
+    browser.addoption("--browser", choices=["chrome", "edge"], default="chrome")
+    browser.addoption("--headed", action="store_true", help="Show the browser window")
+    browser.addoption("--browser-binary", default=None, help="Custom Chrome/Edge executable")
+    browser.addoption("--driver-path", default=None, help="Use an existing compatible WebDriver")
+    browser.addoption(
+        "--browser-no-sandbox",
+        action="store_true",
+        help="Disable the browser sandbox only in an already isolated Linux container",
+    )
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
