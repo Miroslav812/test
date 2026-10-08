@@ -98,6 +98,7 @@ uv run --frozen --no-default-groups --group test pytest
 - Новый браузер для каждого теста; screenshot и DOM в Allure при падении.
 - Параллельные конфликты POST/PATCH/DELETE, проверки атомарности отказов и неизменяемых полей.
 - UI: восстановление после потери сети, работа двух сессий и список из 102 пользователей.
+- UI: отправка форм через Enter, границы длины ввода, смена редактора и очистка черновиков.
 
 ## UI-тесты Selenium: Windows 10/11
 
@@ -112,7 +113,7 @@ uv run --frozen --no-default-groups --group ui pytest tests/ui --browser edge --
 `--headed` показывает окно браузера. Без него тесты выполняются headless.
 Для Chrome замените `--browser edge` на `--browser chrome`. Chrome — выбор по умолчанию.
 Локальная страница и API поднимаются и останавливаются фикстурами; отдельно запускать
-сервер не нужно. Ожидается **22 UI-теста**.
+сервер не нужно. Ожидается **38 UI-тестов**.
 
 Selenium Manager автоматически подбирает WebDriver под установленный браузер при
 первом запуске; для загрузки нужен Интернет. Если менеджер не может скачать драйвер,
@@ -125,7 +126,7 @@ Selenium Manager автоматически подбирает WebDriver под 
 uv run --frozen --no-default-groups --group ui pytest tests/ui --browser edge --alluredir=reports/ui/allure-results --clean-alluredir --junitxml=reports/ui/junit.xml
 ```
 
-Для **всех 104 тестов (API + инфраструктура + UI)**:
+Для **всех 120 тестов (API + инфраструктура + UI)**:
 
 ```powershell
 uv run --frozen --no-default-groups --group ui pytest tests --browser edge
@@ -143,6 +144,7 @@ src/restkit/
   contracts.py        # схемы ответов и общие assertions
   apis/users.py       # методы конкретного ресурса
   ui/pages.py         # BasePage, LoginPage, UsersPage
+  ui/models.py        # именованные значения формы и строки таблицы
 demo_api/app.py        # учебный REST API с изолированным in-memory хранилищем
 demo_api/web/          # интерфейс, работающий с тем же REST API
 tests/
@@ -192,12 +194,21 @@ Allure CLI не требуется для тестов или получения
 
 ## Сложные сценарии
 
-Добавлены 53 проверки: 43 API и 10 UI. Вместе с исходными сценариями набор содержит
-65 API-тестов, 17 проверок инфраструктуры и 22 UI-теста. Подробнее: [docs/advanced-testing.md](docs/advanced-testing.md).
+Метка `advanced` объединяет 69 проверок: 43 API и 26 UI. Полный набор содержит
+65 API-тестов, 17 проверок инфраструктуры и 38 UI-тестов. Подробнее: [docs/advanced-testing.md](docs/advanced-testing.md).
+
+UI-сценарии разделены по смыслу: базовые операции, восстановление, формы и состояния
+редактора. `UserDraft` позволяет обращаться к `user_data.email` вместо строковых ключей.
+Page Objects скрывают локаторы, а `read_user` проверяет сохранённую запись через HTTP.
+Комментарии на русском объясняют причины неочевидных решений; шаги Allure описывают
+действия пользователя.
 
 ```powershell
-# Все новые сценарии, включая UI в Edge
+# Сложные API- и UI-сценарии, включая Edge
 uv run --frozen --no-default-groups --group ui pytest tests -m advanced --browser edge --headed
+
+# Только сложные UI-проверки
+uv run --frozen --no-default-groups --group ui pytest tests/ui -m advanced --browser edge --headed
 
 # Только параллельные API-конфликты, браузер не нужен
 uv run --frozen --no-default-groups --group test pytest -m concurrency

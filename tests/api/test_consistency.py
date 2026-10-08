@@ -58,7 +58,7 @@ def test_patch_cannot_modify_protected_fields(
     before = read_all_users(users)
     response = users.update(str(original.id), {"name": "Attempted change", field: values[field]})
     assert_status(response, 422)
-    # An invalid field must reject the entire PATCH, including its otherwise valid name.
+    # Ошибка одного поля отклоняет весь PATCH, даже если новое имя само по себе допустимо.
     assert read_all_users(users) == before
 
 
@@ -117,9 +117,9 @@ def test_pagination_remains_complete_after_delete_and_insert(
         assert_status(response, 200)
         assert assert_contract(response, UserPage).items == []
 
-    with allure.step("Verify all pages, their totals, ordering and lack of duplicates"):
+    with allure.step("Проверить все страницы, порядок, total и отсутствие дубликатов"):
         check(baseline + batch)
-    with allure.step("Delete a middle record and append a new record"):
+    with allure.step("Удалить запись из середины и добавить новую"):
         assert_status(users.delete(str(batch[3].id)), 204)
         appended = create_user(name="Appended after deletion")
         check(baseline + batch[:3] + batch[4:] + [appended])
@@ -226,7 +226,7 @@ def test_parallel_updates_acknowledge_each_writer_without_corrupting_identity(
     response = users.get(str(original.id))
     assert_status(response, 200)
     final = assert_contract(response, User)
-    # Completion order is nondeterministic; the contract has no optimistic locking/version field.
+    # Порядок завершения не задан: контракт не содержит версии для оптимистической блокировки.
     assert final.name in names
     assert final == original.model_copy(update={"name": final.name})
 

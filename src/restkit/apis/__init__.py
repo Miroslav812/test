@@ -1,1 +1,1 @@
-"""Endpoint-specific clients."""
+"""Клиенты ресурсов REST API."""

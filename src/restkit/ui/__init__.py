@@ -1,1 +1,1 @@
-"""Page Objects for the bundled demo application."""
+"""Объекты страниц учебного приложения."""

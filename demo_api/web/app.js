@@ -34,7 +34,7 @@ function renderUsers() {
     for (const field of ["name", "email", "role"]) {
       const cell = document.createElement("td");
       cell.dataset.testid = `user-${field}`;
-      // API data is text, not markup. This also keeps user-supplied names from executing HTML.
+      // textContent не позволяет пользовательскому имени превратиться в исполняемый HTML.
       cell.textContent = user[field];
       row.append(cell);
     }
@@ -58,7 +58,7 @@ function renderUsers() {
 
 async function refreshUsers() {
   find("users-body").dataset.loaded = "false";
-  // The demo supports pagination too: fetch every page so UI cleanup/search never truncate data.
+  // Загружаем все страницы, иначе поиск и список не увидят записи после сотой.
   const loaded = [];
   let page;
   do {
@@ -162,7 +162,7 @@ find("refresh-users").addEventListener("click", () => {
   refreshUsers().catch((error) => message("user-error", error.message));
 });
 find("logout").addEventListener("click", () => {
-  // Session data stays in memory; signing out clears both the token and the rendered records.
+  // Сессия живёт в памяти страницы; при выходе очищаем токен и показанные записи.
   token = null;
   users = [];
   editingId = null;

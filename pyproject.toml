@@ -60,7 +60,7 @@ select = ["E", "F", "I", "B", "UP", "SIM"]
 
 [tool.mypy]
 plugins = ["pydantic.mypy"]
-# Allure's public decorators are re-exported from its untyped implementation.
+# Декораторы Allure экспортируются из модуля без аннотаций типов.
 untyped_calls_exclude = ["allure_commons"]
 python_version = "3.12"
 strict = true

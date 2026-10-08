@@ -1,1 +1,1 @@
-"""Reusable REST API testing primitives."""
+"""Общие инструменты для тестирования REST API."""

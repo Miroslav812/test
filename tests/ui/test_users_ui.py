@@ -1,14 +1,15 @@
 from collections.abc import Callable
-from typing import Any
 
 import allure
 import pytest
 
 from restkit.apis.users import UsersApi
-from restkit.contracts import User, assert_contract, assert_status
+from restkit.contracts import User, assert_status
+from restkit.ui.models import UserDraft
 from restkit.ui.pages import LoginPage, UsersPage
+from tests.helpers import read_user
 
-pytestmark = [pytest.mark.ui, pytest.mark.demo, allure.epic("UI"), allure.feature("Users")]
+pytestmark = [pytest.mark.ui, pytest.mark.demo, allure.epic("UI"), allure.feature("Пользователи")]
 
 
 @pytest.mark.smoke
@@ -23,6 +24,7 @@ def test_invalid_credentials(login_page: LoginPage, username: str, password: str
     login_page.submit_credentials(username, password)
     assert login_page.error_message == "Invalid credentials"
     login_page.wait_loaded()
+    assert login_page.sign_in().emails == []
 
 
 @pytest.mark.negative
@@ -35,19 +37,17 @@ def test_required_username(login_page: LoginPage) -> None:
 @pytest.mark.smoke
 @pytest.mark.parametrize("role", ["user", "admin"])
 def test_create_user_persists_data(
-    users_page: UsersPage, ui_payload: dict[str, Any], users: UsersApi, role: str
+    users_page: UsersPage, user_data: UserDraft, users: UsersApi, role: str
 ) -> None:
-    with allure.step("Create a unique user through the browser"):
-        users_page.create_user(ui_payload["name"], ui_payload["email"], role)
-        row = users_page.user(ui_payload["email"])
-        assert row.name == ui_payload["name"]
+    with allure.step("Создать пользователя через браузер"):
+        users_page.create_user(user_data.name, user_data.email, role)
+        row = users_page.user(user_data.email)
+        assert row.name == user_data.name
         assert row.role == role
-    with allure.step("Verify the browser action persisted data in the API"):
-        response = users.get(row.id)
-        assert_status(response, 200)
-        saved = assert_contract(response, User)
-        assert saved.email == ui_payload["email"]
-        assert saved.name == ui_payload["name"]
+    with allure.step("Проверить сохранённые данные через API"):
+        saved = read_user(users, row.id)
+        assert saved.email == user_data.email
+        assert saved.name == user_data.name
         assert saved.role == role
 
 
@@ -58,9 +58,7 @@ def test_edit_user_persists_name(
     users_page.refresh()
     users_page.edit_user(str(created.email), "Edited in browser")
     assert users_page.user(str(created.email)).name == "Edited in browser"
-    response = users.get(str(created.id))
-    assert_status(response, 200)
-    assert assert_contract(response, User).name == "Edited in browser"
+    assert read_user(users, created.id) == created.model_copy(update={"name": "Edited in browser"})
 
 
 def test_delete_user_removes_record(
@@ -75,9 +73,9 @@ def test_delete_user_removes_record(
 
 @pytest.mark.negative
 def test_duplicate_email_is_rejected(
-    users_page: UsersPage, ui_payload: dict[str, Any], create_user: Callable[..., User]
+    users_page: UsersPage, user_data: UserDraft, create_user: Callable[..., User]
 ) -> None:
-    created = create_user(email=ui_payload["email"])
+    created = create_user(email=user_data.email)
     users_page.refresh()
     users_page.create_user("Duplicate", str(created.email))
     assert users_page.error_message == "Email already exists"
@@ -101,7 +99,7 @@ def test_search_filters_users(users_page: UsersPage, create_user: Callable[..., 
 def test_user_name_is_rendered_as_text(
     users_page: UsersPage, create_user: Callable[..., User]
 ) -> None:
-    # A real browser catches accidental innerHTML use that an API schema test cannot detect.
+    # Браузер обнаруживает небезопасный innerHTML, который не виден в проверке API-схемы.
     name = '<img src="x" onerror="window.unexpectedImage=true">'
     created = create_user(name=name)
     users_page.refresh()
@@ -112,6 +110,5 @@ def test_user_name_is_rendered_as_text(
 def test_logout_returns_to_login(users_page: UsersPage) -> None:
     login = users_page.sign_out()
     login.wait_loaded()
-    # Reloading verifies that the signed-out token was not persisted in browser storage.
-    login.driver.refresh()
-    login.wait_loaded()
+    # После перезагрузки проверяем, что токен не был сохранён в браузере.
+    login.reload()

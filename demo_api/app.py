@@ -51,7 +51,7 @@ def create_app() -> FastAPI:
 
     @app.get("/ui", include_in_schema=False)
     def ui() -> FileResponse:
-        # The UI and API share an origin, so tests exercise real requests without CORS overrides.
+        # UI и API имеют общий origin: браузер отправляет реальные запросы без настройки CORS.
         return FileResponse(web_directory / "index.html")
 
     def find(user_id: UUID) -> StoredUser:

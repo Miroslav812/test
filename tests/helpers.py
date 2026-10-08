@@ -1,8 +1,9 @@
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from threading import Barrier
 from typing import Any
+from uuid import UUID
 
 import httpx
 
@@ -12,8 +13,28 @@ from restkit.config import Settings
 from restkit.contracts import User, UserPage, assert_contract, assert_status
 
 
+def read_user(users: UsersApi, user_id: str | UUID) -> User:
+    """Читаем сохранённую запись с проверкой HTTP-статуса и схемы ответа."""
+    response = users.get(str(user_id))
+    assert_status(response, 200)
+    return assert_contract(response, User)
+
+
+def delete_test_users(users: UsersApi, user_ids: Iterable[str | UUID]) -> None:
+    """Удаляем только записи теста; уже удалённая запись тоже считается очищенной."""
+    failures = []
+    for user_id in user_ids:
+        try:
+            response = users.delete(str(user_id))
+            if response.status_code not in {204, 404}:
+                failures.append(f"HTTP {response.status_code}")
+        except httpx.HTTPError as exc:
+            failures.append(type(exc).__name__)
+    assert not failures, f"Не удалось очистить тестовые данные: {failures}"
+
+
 def read_all_users(users: UsersApi) -> list[User]:
-    """Read a stable snapshot; callers must finish their concurrent writers first."""
+    """Снимаем полный снимок после завершения всех конкурентных изменений."""
     result: list[User] = []
     while True:
         response = users.list(limit=100, offset=len(result))
@@ -42,12 +63,11 @@ def parallel_requests(settings: Settings, specs: Sequence[RequestSpec]) -> list[
     barrier = Barrier(len(specs), timeout=10)
 
     def send(spec: RequestSpec) -> httpx.Response:
-        # Build each connection pool before the barrier; clients are ready before the race starts.
-        # The timeout prevents a failed worker from leaving the remaining threads blocked forever.
+        # Клиенты готовы до общего старта. Таймаут барьера исключает зависание при сбое потока.
         with ApiClient(settings) as client:
             barrier.wait()
             return client.request(spec.method, spec.path, json=spec.payload)
 
     with ThreadPoolExecutor(max_workers=len(specs)) as pool:
-        # map preserves input order, allowing PATCH responses to be matched to their writer.
+        # map сохраняет порядок запросов: каждый PATCH-ответ сопоставляем со своим автором.
         return list(pool.map(send, specs))

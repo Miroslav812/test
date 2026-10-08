@@ -15,7 +15,7 @@ from restkit.client import ApiClient
 from restkit.config import Settings
 from restkit.contracts import User, assert_contract, assert_status
 from tests.factories import user_payload
-from tests.helpers import read_all_users
+from tests.helpers import delete_test_users, read_all_users
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
@@ -52,7 +52,7 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
 
 @pytest.fixture(scope="session")
 def demo_url() -> Iterator[str]:
-    # Each xdist worker owns an isolated store and OS-assigned port.
+    # У каждого xdist-процесса своё хранилище; свободный порт выбирает ОС.
     with socket.socket() as sock:
         sock.bind(("127.0.0.1", 0))
         url = f"http://127.0.0.1:{sock.getsockname()[1]}"
@@ -137,20 +137,12 @@ def create_user(users: UsersApi) -> Iterator[Callable[..., User]]:
     def create(**overrides: Any) -> User:
         response = users.create(user_payload(**overrides))
         assert_status(response, 201)
-        # Register cleanup before schema validation, so contract failures do not leak records.
+        # Запоминаем ID до проверки схемы, чтобы удалить запись и при ошибке контракта.
         created.append(str(response.json()["id"]))
         return assert_contract(response, User)
 
     yield create
-    failures = []
-    for user_id in reversed(created):
-        try:
-            response = users.delete(user_id)
-            if response.status_code not in {204, 404}:
-                failures.append(f"HTTP {response.status_code}")
-        except httpx.HTTPError as exc:
-            failures.append(type(exc).__name__)
-    assert not failures, f"Test data cleanup failed: {failures}"
+    delete_test_users(users, reversed(created))
 
 
 @pytest.fixture
@@ -159,19 +151,10 @@ def owned_payloads(users: UsersApi) -> Iterator[Callable[..., dict[str, Any]]]:
 
     def create(**overrides: Any) -> dict[str, Any]:
         payload = user_payload(**overrides)
-        # Ownership is recorded before a request, even if a racing response is never validated.
+        # Регистрируем email до запроса: конкурентный ответ может не дойти до проверки схемы.
         emails.add(str(payload["email"]))
         return payload
 
     yield create
-    failures = []
-    for user in read_all_users(users):
-        if str(user.email) not in emails:
-            continue
-        try:
-            response = users.delete(str(user.id))
-            if response.status_code not in {204, 404}:
-                failures.append(f"HTTP {response.status_code}")
-        except httpx.HTTPError as exc:
-            failures.append(type(exc).__name__)
-    assert not failures, f"Owned test data cleanup failed: {failures}"
+    owned_ids = [user.id for user in read_all_users(users) if str(user.email) in emails]
+    delete_test_users(users, owned_ids)

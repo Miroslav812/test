@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 class ApiClient:
-    """One connection pool per fixture. No retries for state-changing requests."""
+    """Пул соединений на фикстуру; изменяющие данные запросы не повторяются автоматически."""
 
     def __init__(self, settings: Settings, *, transport: httpx.BaseTransport | None = None) -> None:
         headers = {"Accept": "application/json"}
@@ -35,7 +35,7 @@ class ApiClient:
             raise ValueError("API paths must not contain traversal segments")
         started = perf_counter()
         response = self._http.request(method, path, **kwargs)
-        # Deliberately omit URL parameters, headers and bodies (may contain secrets/PII).
+        # Не пишем параметры URL, заголовки и тела: в них могут быть токены и личные данные.
         logger.info("HTTP %s -> %s (%.3fs)", method, response.status_code, perf_counter() - started)
         return response
 

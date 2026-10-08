@@ -1,1 +1,1 @@
-"""Local demonstration service, not a production application."""
+"""Локальный учебный сервис для демонстрации автотестов."""
